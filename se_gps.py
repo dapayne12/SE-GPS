@@ -35,7 +35,6 @@ def main():
 
     cluster_coordinates(clusters, resources)
 
-    print()
     print('Clustered coordinates:')
 
     for cluster in clusters:
@@ -260,6 +259,8 @@ def handle_duplicates(duplicates):
 
         print('Invalid response.')
 
+    print()
+
 
 def mark_duplicates(duplicates, skip_index):
     """
@@ -336,7 +337,7 @@ def cluster_coordinates(clusters, resources):
 
     for resource in resources:
         (distance, cluster) = find_nearest_cluster(resource, clusters)
-        if distance > 500000:
+        if distance > DUPLICATE_CLUSTER_DISTANCE_METERS:
             unsorted_resources.append(resource)
             continue
 
@@ -350,7 +351,7 @@ def cluster_coordinates(clusters, resources):
     if len(unsorted_resources) > 0:
         sys.stderr.write('No cluster found for coordinates:\n')
         for resource in unsorted_resources:
-            sys.stderr.write(f'{coordinate_to_se_gps(resource)}\n')
+            sys.stderr.write(f'{coordinate_to_se_gps(resource)}\n\n')
 
 
 def sanitize_folder_name(name):
