@@ -2,8 +2,32 @@
 
 import math
 import os
+import re
 import sys
 
+
+# Zone abbreveations
+ZONES = [
+    'GZ',
+    'AS',
+    'PP',
+    'ZP',
+    'ZS'
+]
+
+# Ore abbreveations, in priority order
+ORES = [
+    'U',
+    'PT',
+    'AU',
+    'AG',
+    'ICE',
+    'MG',
+    'CO',
+    'NI',
+    'SI',
+    'FE'
+]
 
 CLUSTER_PREFIX = 'Cluster'
 
@@ -47,6 +71,10 @@ def main():
         clusters, DUPLICATE_CLUSTER_DISTANCE_METERS)
     resources = deduplicate_coordinates(
         resources, DUPLICATE_RESOURCE_DISTANCE_METERS)
+
+    fix_names(resources)
+
+    make_names_unique(resources)
 
     cluster_coordinates(clusters, resources)
 
@@ -457,6 +485,107 @@ def coordinate_to_se_gps(coordinate):
     notes = coordinate['notes']
 
     return f'GPS:{name}:{x}:{y}:{z}:{colour}:{notes}:'
+
+
+def fix_names(resources):
+    """
+    Fix and normalize all resource names.
+
+    Parameters
+    ----------
+    resources : list
+        List of all resource coordinates.
+    """
+
+    for resource in resources:
+        name = resource['name']
+        while (normalized_name := normalize_name(name)) is None:
+            print(f'Invalid name: {name}')
+            name = input('Enter a new name: ').strip()
+        resource['name'] = normalized_name
+
+
+def normalize_name(name):
+    """
+    Normalize a resource name.
+
+    Parameters
+    ----------
+    name : str
+        The resource name.
+
+    Returns
+    -------
+    str | none
+        The normalized name, or None if the name is invalid and couldn't be
+        normalized.
+    """
+
+    zone_match = re.match(r'^\s*(?P<zone>\S+)\s+(?P<ores>.+?)(_\d+)?$', name)
+    if zone_match is None:
+        return None
+
+    zone = zone_match.group('zone').upper()
+    ores = zone_match.group('ores').upper()
+
+    if zone not in ZONES:
+        sys.stderr.write(f'Invalid zone: {zone}\n')
+        return None
+
+    valid_ores = []
+    for ores_match in re.finditer(
+            r'\s*(?P<ore>[A-Z]+)(\s+(?P<size>[^,]+)\s*,?)?', ores):
+        ore = ores_match.group('ore')
+        size = ores_match.group('size')
+        if size is not None:
+            size = size.strip()
+
+        if ore not in ORES:
+            sys.stderr.write(f'Invalid ore: {ore}\n')
+            return None
+
+        valid_ores.append((ore, size))
+
+    valid_ores.sort(key=lambda valid_ore: ORES.index(valid_ore[0]))
+
+    normalized_name = f'{zone}'
+    first = True
+    for valid_ore in valid_ores:
+        if first:
+            first = False
+            normalized_name += ' '
+        else:
+            normalized_name += ' , '
+
+        (ore_name, ore_size) = valid_ore
+        normalized_name += ore_name
+        if ore_size is not None:
+            normalized_name += f' {ore_size}'
+
+    return normalized_name
+
+
+def make_names_unique(resources):
+    """
+    Make every resource name unique. This makes it easier to identify GPS
+    coordinates in the GPS list.
+
+    Parameters
+    ----------
+    resources : list
+        List of resource coordinates. The names are updated so each name is
+        unique.
+    """
+
+    name_hash = {}
+
+    for resource in resources:
+        name = resource['name']
+        if name in name_hash:
+            resource['name'] = f'{name} _{name_hash[name]}'
+            name_hash[name] += 1
+        else:
+            name_hash[name] = 2
 
 
 if __name__ == '__main__':
