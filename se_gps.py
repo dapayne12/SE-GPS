@@ -82,6 +82,8 @@ def main():
         for cluster in clusters:
             if 'resources' in cluster:
                 handle.write(f'{coordinate_to_se_gps(cluster)}\n')
+                cluster['resources'].sort(
+                    key=lambda coord: ORES.index(coord['name'].split()[1]))
                 for resource in cluster['resources']:
                     handle.write(f'{coordinate_to_se_gps(resource)}\n')
 
