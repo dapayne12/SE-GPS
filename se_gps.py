@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import math
+import os
 import sys
 
 
@@ -19,12 +20,26 @@ def main():
     clusters.
     """
 
-    if len(sys.argv) == 2:
-        with open(sys.argv[1]) as handle:
-            coordinates = read_coordinates_from_handle(handle)
-    else:
+    if len(sys.argv) != 3:
         sys.stderr.write('Wrong number of arguments!\n')
+        usage()
         exit(1)
+
+    input_filename = sys.argv[1]
+    output_filename = sys.argv[2]
+
+    if not os.path.isfile(input_filename):
+        sys.stderr.write(f'Input file does not exsit: {input_filename}\n')
+        usage()
+        exit(1)
+
+    if os.path.exists(output_filename):
+        sys.stderr.write(f'Output file already exists: {output_filename}\n')
+        usage()
+        exit(1)
+
+    with open(input_filename) as handle:
+        coordinates = read_coordinates_from_handle(handle)
 
     (clusters, resources) = sort_coordinates(coordinates)
 
@@ -35,13 +50,23 @@ def main():
 
     cluster_coordinates(clusters, resources)
 
-    print('Clustered coordinates:')
+    with open(output_filename, 'w') as handle:
+        for cluster in clusters:
+            if 'resources' in cluster:
+                handle.write(f'{coordinate_to_se_gps(cluster)}\n')
+                for resource in cluster['resources']:
+                    handle.write(f'{coordinate_to_se_gps(resource)}\n')
 
-    for cluster in clusters:
-        if 'resources' in cluster:
-            print(coordinate_to_se_gps(cluster))
-            for resource in cluster['resources']:
-                print(coordinate_to_se_gps(resource))
+    print(f'Coordinates output to {output_filename}')
+
+
+def usage():
+    """
+    Print usage information to the screen.
+    """
+
+    print('Usage:')
+    print('\t./se_gps.py <input_file> <output_file>')
 
 
 def read_coordinates_from_handle(coordinate_input):
