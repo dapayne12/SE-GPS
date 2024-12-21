@@ -4,10 +4,19 @@ import math
 import sys
 
 
+CLUSTER_PREFIX = 'Cluster'
+
+# 2km
+DUPLICATE_RESOURCE_DISTANCE_METERS = 2 * 1000
+
+# 500km
+DUPLICATE_CLUSTER_DISTANCE_METERS = 500 * 1000
+
+
 def main():
     """
     Read Space Engineers GPS coordinates from a file. Sort the coordinates into
-    sectors.
+    clusters.
     """
 
     if len(sys.argv) == 2:
@@ -19,8 +28,10 @@ def main():
 
     (clusters, resources) = sort_coordinates(coordinates)
 
-    clusters = deduplicate_coordinates(clusters, 500000)
-    resources = deduplicate_coordinates(resources, 2000)
+    clusters = deduplicate_coordinates(
+        clusters, DUPLICATE_CLUSTER_DISTANCE_METERS)
+    resources = deduplicate_coordinates(
+        resources, DUPLICATE_RESOURCE_DISTANCE_METERS)
 
     cluster_coordinates(clusters, resources)
 
@@ -275,8 +286,8 @@ def mark_duplicates(duplicates, skip_index):
 def sort_coordinates(coordinates):
     """
     Sort coordinates into clusters and resources. If the name of a coordinate
-    starts with "Cluster" then it's considered a cluster coordinate, otherwise
-    it's considered a resource coordinate.
+    starts with CLUSTER_PREFIX then it's considered a cluster coordinate,
+    otherwise it's considered a resource coordinate.
 
     Parameters
     ----------
@@ -294,7 +305,7 @@ def sort_coordinates(coordinates):
     resources = []
 
     for coordinate in coordinates:
-        if coordinate['name'].startswith('Cluster'):
+        if coordinate['name'].startswith(CLUSTER_PREFIX):
             clusters.append(coordinate)
         else:
             resources.append(coordinate)
