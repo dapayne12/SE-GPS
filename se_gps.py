@@ -24,6 +24,9 @@ def main():
 
     cluster_coordinates(clusters, resources)
 
+    print()
+    print('Clustered coordinates:')
+
     for cluster in clusters:
         if 'resources' in cluster:
             print(coordinate_to_se_gps(cluster))
@@ -240,7 +243,7 @@ def handle_duplicates(duplicates):
             if response >= 1 and response <= index:
                 mark_duplicates(duplicates, response - 1)
                 break
-        except:
+        except Exception:
             # Fall through to the invalid response
             pass
 
