@@ -567,7 +567,7 @@ def cluster_coordinates(clusters, resources):
 
     for resource in resources:
         (distance, cluster) = find_nearest_cluster(resource, clusters)
-        if distance > DUPLICATE_CLUSTER_DISTANCE_METERS:
+        if distance is None or distance > DUPLICATE_CLUSTER_DISTANCE_METERS:
             cluster = create_cluster_for_resource(resource)
             clusters.append(cluster)
             new_clusters.append(cluster)
@@ -616,7 +616,8 @@ def create_cluster_for_resource(resource):
         'y': resource['y'],
         'z': resource['z'],
         'colour': resource['colour'],
-        'notes': sanitize_folder_name(name)
+        'notes': sanitize_folder_name(name),
+        'sector': resource['sector']
     }
 
     return cluster
@@ -658,15 +659,20 @@ def find_nearest_cluster(resource, clusters):
 
     Returns
     -------
-    tuple (int, dict)
+    tuple (int | None, dict | None)
         A tuple with two elements. The first element is the distance to the
         nearest cluster in meters. The second element is the nearest cluster
         coordinate.
+
+        If no cluster is in the same sector as the resource (None, None) is
+        returned.
     """
 
     nearest_cluster = None
     nearest_cluster_distance = None
     for cluster in clusters:
+        if cluster['sector'] != resource['sector']:
+            continue
         distance = check_distance(resource, cluster)
         if (nearest_cluster_distance is None or
                 distance < nearest_cluster_distance):
