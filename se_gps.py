@@ -2,7 +2,9 @@
 
 import math
 import os
+import random
 import re
+import string
 import sys
 
 
@@ -86,6 +88,7 @@ def main():
                     key=lambda coord: ORES.index(coord['name'].split()[1]))
                 for resource in cluster['resources']:
                     handle.write(f'{coordinate_to_se_gps(resource)}\n')
+                handle.write('\n')
 
     print(f'Coordinates output to {output_filename}')
 
@@ -384,7 +387,7 @@ def cluster_coordinates(clusters, resources):
         the clusters based on distance.
     """
 
-    unsorted_resources = []
+    new_clusters = []
 
     for cluster in clusters:
         # Add the cluster to its own group
@@ -393,8 +396,9 @@ def cluster_coordinates(clusters, resources):
     for resource in resources:
         (distance, cluster) = find_nearest_cluster(resource, clusters)
         if distance > DUPLICATE_CLUSTER_DISTANCE_METERS:
-            unsorted_resources.append(resource)
-            continue
+            cluster = create_cluster_for_resource(resource)
+            clusters.append(cluster)
+            new_clusters.append(cluster)
 
         # Add the cluster to a folder
         resource['notes'] = cluster['notes']
@@ -403,10 +407,47 @@ def cluster_coordinates(clusters, resources):
             cluster['resources'] = []
         cluster['resources'].append(resource)
 
-    if len(unsorted_resources) > 0:
-        sys.stderr.write('No cluster found for coordinates:\n')
-        for resource in unsorted_resources:
-            sys.stderr.write(f'{coordinate_to_se_gps(resource)}\n\n')
+    # For the new clusters, reposition the cluster GPS to the center of the
+    # cluster.
+    for cluster in new_clusters:
+        total_x = 0
+        total_y = 0
+        total_z = 0
+        for resource in cluster['resources']:
+            total_x += resource['x']
+            total_y += resource['y']
+            total_z += resource['z']
+        total_resources = len(cluster['resources'])
+        cluster['x'] = round(total_x / total_resources, 2)
+        cluster['y'] = round(total_y / total_resources, 2)
+        cluster['z'] = round(total_z / total_resources, 2)
+
+
+def create_cluster_for_resource(resource):
+    """
+    Generate a random custer name at the same GPS coordinates as the provided
+    coordinate.
+
+    Parameters
+    ----------
+    resource : dict
+
+    """
+
+    random_name_postfix = ''.join(
+        random.SystemRandom().choice(string.ascii_uppercase) for _ in range(4))
+    name = f'{CLUSTER_PREFIX} {random_name_postfix}'
+
+    cluster = {
+        'name': name,
+        'x': resource['x'],
+        'y': resource['y'],
+        'z': resource['z'],
+        'colour': resource['colour'],
+        'notes': sanitize_folder_name(name)
+    }
+
+    return cluster
 
 
 def sanitize_folder_name(name):
