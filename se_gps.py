@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import datetime
 import math
 import os
 import random
@@ -7,6 +8,24 @@ import re
 import string
 import sys
 
+
+OUTPUT_PREAMBLE = """
+# You can easily add GPSs to your list by making an LCD, opening the text edit
+# by hitting 'F', and pasting your desired GPSs into it.  Then go into your GPS
+# list, and turn them on.
+#
+# Order of Precedence:
+#   U (Uranium)
+#   PT (Platnium)
+#   AU (Gold)
+#   AG (Silver)
+#   ICE
+#   MG (Magnesium)
+#   CO (Cobalt)
+#   NI (Nickel)
+#   SI (Silicon)
+#   FE (Iron)
+""".strip()
 
 # Coordinates from ingame "!nexus getsectors true". Remove the ':' character in
 # the radius. Must be in priority order. GPS coordinate will be considered in
@@ -29,107 +48,128 @@ import sys
 #         'sector': 'AP'
 #     },
 #     'abbr': 'AP',
+#     'header': 'Auroria Planet PvE',
 #     'radius': 250000
 # }
 SECTORS = [
     {
         'coordinate': 'GPS:Auroria Planet - (R250km):' +
                       '-2894701.55:1033798.5:2003378.29:#FFFFFF00:',
-        'abbr': 'AP'
+        'abbr': 'AP',
+        'header': 'Auroria Planet PvE'
     },
     {
         'coordinate': 'GPS:Auroria Space - (R750km):' +
                       '-2894701.55:1033798.5:2003378.29:#FFFFFF00:',
-        'abbr': 'AS'
+        'abbr': 'AS',
+        'header': 'Auroria Space PvE'
     },
     {
         'coordinate': 'GPS:K.O.T.H - (R250km):' +
                       '5018866.7:-6120757.03:4566088.55:#FFFFFF00:',
-        'abbr': 'KH'
+        'abbr': 'KH',
+        'header': 'K.O.T.H. PvP'
     },
     {
         'coordinate': 'GPS:Korrath Planet - (R600km):' +
                       '-917607.09:-232737.66:-9611492.83:#FFFFFF00:',
-        'abbr': 'KP'
+        'abbr': 'KP',
+        'header': 'Korrath Planet PvP'
     },
     {
         'coordinate': 'GPS:Korrath Space - (R1000km):' +
                       '-917607.09:-232737.66:-9611492.83:#FFFFFF00:',
-        'abbr': 'KS'
+        'abbr': 'KS',
+        'header': 'Korrath Space PvP'
     },
     {
         'coordinate': 'GPS:Paratha Prime Planet - (R250km):' +
                       '2210546.1:0:3529973.22:#FFFFFF00:',
-        'abbr': 'PP'
+        'abbr': 'PP',
+        'header': 'Paratha Planet PvE'
     },
     {
         'coordinate': 'GPS:Paratha Prime Space - (R750km):' +
                       '2210546.1:0:3529973.22:#FFFFFF00:',
-        'abbr': 'PS'
+        'abbr': 'PS',
+        'header': 'Paratha Space PvE'
     },
     {
         'coordinate': 'GPS:Ravarna Planet - (R250km):' +
                       '6892920.19:266488.22:-163203.33:#FFFFFF00:',
-        'abbr': 'RP'
+        'abbr': 'RP',
+        'header': 'Ravarna Planet PvP'
     },
     {
         'coordinate': 'GPS:Ravarna Space - (R750km):' +
                       '6892920.19:266488.22:-163203.33:#FFFFFF00:',
-        'abbr': 'RS'
+        'abbr': 'RS',
+        'header': 'Ravarna Space PvP'
     },
     {
         'coordinate': 'GPS:Umbra Planet - (R250km):' +
                       '1190569.51:-8672830.43:-1339138.72:#FFFFFF00:',
-        'abbr': 'UP'
+        'abbr': 'UP',
+        'header': 'Umbra Planet Pv?'
     },
     {
         'coordinate': 'GPS:Umbra Space - (R750km):' +
                       '1190569.51:-8672830.43:-1339138.72:#FFFFFF00:',
-        'abbr': 'US'
+        'abbr': 'US',
+        'header': 'Umbra Space Pv?'
     },
     {
         'coordinate': 'GPS:Volcanis Planet - (R250km):' +
                       '-5311681.54:1664010.91:-3307980.03:#FFFFFF00:',
-        'abbr': 'VP'
+        'abbr': 'VP',
+        'header': 'Volcanis Planet PvP'
     },
     {
         'coordinate': 'GPS:Volcanis Space - (R750km):' +
                       '-5311681.54:1664010.91:-3307980.03:#FFFFFF00:',
-        'abbr': 'VS'
+        'abbr': 'VS',
+        'header': 'Volcanis Space PvP'
     },
     {
         'coordinate': 'GPS:Zarion Planet - (R250km):' +
                       '1088776.01:0:-2619759:#FFFFFF00:',
-        'abbr': 'ZP'
+        'abbr': 'ZP',
+        'header': 'Zarion Planet PvE'
     },
     {
         'coordinate': 'GPS:Zarion Space - (R750km):' +
                       '1088776.01:0:-2619759:#FFFFFF00:',
-        'abbr': 'ZS'
+        'abbr': 'ZS',
+        'header': 'Zarion Space PvE'
     },
     {
         'coordinate': 'GPS:The Hub - (R500km):0:0:0:#FFFFFF00:',
-        'abbr': 'HB'
+        'abbr': 'HB',
+        'header': 'The Hub PvE'
     },
     {
         'coordinate': 'GPS:Roach Motel - (R1500km):0:0:0:#FFFFFF00:',
-        'abbr': 'RM'
+        'abbr': 'RM',
+        'header': 'Roach Motel PvE'
     },
     {
         'coordinate': 'GPS:The Goldilocks Zone - (R5000km):0:0:0:#FFFFFF00:',
-        'abbr': 'GZ'
+        'abbr': 'GZ',
+        'header': 'Goldilocks Zone PvE'
     },
     {
         'coordinate': 'GPS:Roach Hostel - (R6000km):0:0:0:#FFFFFF00:',
-        'abbr': 'RH'
+        'abbr': 'RH',
+        'header': 'Roach Hostel PvE'
     },
     {
         'coordinate': 'GPS:Contested Barrens - (R8500km):0:0:0:#FFFFFF00:',
-        'abbr': 'CB'
+        'abbr': 'CB',
+        'header': 'Contested Barrens PvP'
     }
 ]
 
-# Ore abbreveations, in priority order
+# Ore abbreviation, in priority order
 ORES = [
     'U',
     'PT',
@@ -194,8 +234,24 @@ def main():
 
     cluster_coordinates(clusters, resources)
 
+    clusters.sort(
+        key=lambda cluster: sector_index(cluster['sector']), reverse=True)
+
+    current_sector_header = None
+
     with open(output_filename, 'w') as handle:
+        current_date = datetime.datetime.today().strftime('%Y.%m.%d')
+        handle.write(f"# Up-to-date as of {current_date}\n#\n")
+        handle.write(f'{OUTPUT_PREAMBLE}\n\n')
         for cluster in clusters:
+
+            # Print header if different than the last header
+            for sector in SECTORS:
+                if sector['abbr'] == cluster['sector']:
+                    if sector['header'] != current_sector_header:
+                        handle.write(f'\n# {sector["header"]}:\n\n')
+                        current_sector_header = sector['header']
+
             if 'resources' in cluster:
                 handle.write(f'{coordinate_to_se_gps(cluster)}\n')
                 cluster['resources'].sort(
@@ -205,6 +261,28 @@ def main():
                 handle.write('\n')
 
     print(f'Coordinates output to {output_filename}')
+
+
+def sector_index(sector_abbr):
+    """
+    Get the index of a sector.
+
+    Parameters
+    ----------
+    sector_abbr : str
+        The sector abbreviation.
+
+    Returns
+    -------
+    int
+        The index of the sector.
+    """
+
+    for i in range(len(SECTORS)):
+        if SECTORS[i]['abbr'] == sector_abbr:
+            return i
+
+    return -1
 
 
 def process_sectors():
@@ -295,6 +373,10 @@ def parse_coordinate(coordinate_line, sector=None):
     coordinate_line = coordinate_line.strip()
     if len(coordinate_line) == 0:
         # Empty line, just skip
+        return None
+
+    if coordinate_line.startswith('#'):
+        # Skip comments
         return None
 
     coordinate_tokens = coordinate_line.split(':')
@@ -401,7 +483,11 @@ def find_duplicates(coordinate, coordinates, min_distance):
     duplicates = []
 
     for test_coordinate in coordinates:
-        if coordinate == test_coordinate or is_duplicate(test_coordinate):
+        if coordinate == test_coordinate:
+            continue
+        if is_duplicate(test_coordinate):
+            continue
+        if coordinate['sector'] != test_coordinate['sector']:
             continue
         distance = check_distance(coordinate, test_coordinate)
         if distance < min_distance:
@@ -800,7 +886,7 @@ def valid_sector(sector_abbr):
     Parameters
     ----------
     sector_abbr : str
-        The sector abbriviation to check.
+        The sector abbreviation to check.
 
     Returns
     -------
