@@ -8,13 +8,125 @@ import string
 import sys
 
 
-# Zone abbreveations
-ZONES = [
-    'GZ',
-    'AS',
-    'PP',
-    'ZP',
-    'ZS'
+# Coordinates from ingame "!nexus getsectors true". Remove the ':' character in
+# the radius. Must be in priority order. GPS coordinate will be considered in
+# the first sector in this list that matches.
+#
+# All inner zones must come before outer zones. For example Auroria Planet
+# comes before Auroria Space. The Hub comes before Roach Motel. Zarion Space
+# comes before Goldilocks Zone.
+#
+# This list is processed early in process_sectors(), converting each item into
+# an item similar to the following:
+# {
+#     'coordinate': {
+#         'name': 'Auroria Planet - (R250km)',
+#         'x': -2894701.55,
+#         'y': 1033798.5,
+#         'z': 2003378.29,
+#         'colour': '#FFFFFF00',
+#         'notes': '',
+#         'sector': 'AP'
+#     },
+#     'abbr': 'AP',
+#     'radius': 250000
+# }
+SECTORS = [
+    {
+        'coordinate': 'GPS:Auroria Planet - (R250km):' +
+                      '-2894701.55:1033798.5:2003378.29:#FFFFFF00:',
+        'abbr': 'AP'
+    },
+    {
+        'coordinate': 'GPS:Auroria Space - (R750km):' +
+                      '-2894701.55:1033798.5:2003378.29:#FFFFFF00:',
+        'abbr': 'AS'
+    },
+    {
+        'coordinate': 'GPS:K.O.T.H - (R250km):' +
+                      '5018866.7:-6120757.03:4566088.55:#FFFFFF00:',
+        'abbr': 'KH'
+    },
+    {
+        'coordinate': 'GPS:Korrath Planet - (R600km):' +
+                      '-917607.09:-232737.66:-9611492.83:#FFFFFF00:',
+        'abbr': 'KP'
+    },
+    {
+        'coordinate': 'GPS:Korrath Space - (R1000km):' +
+                      '-917607.09:-232737.66:-9611492.83:#FFFFFF00:',
+        'abbr': 'KS'
+    },
+    {
+        'coordinate': 'GPS:Paratha Prime Planet - (R250km):' +
+                      '2210546.1:0:3529973.22:#FFFFFF00:',
+        'abbr': 'PP'
+    },
+    {
+        'coordinate': 'GPS:Paratha Prime Space - (R750km):' +
+                      '2210546.1:0:3529973.22:#FFFFFF00:',
+        'abbr': 'PS'
+    },
+    {
+        'coordinate': 'GPS:Ravarna Planet - (R250km):' +
+                      '6892920.19:266488.22:-163203.33:#FFFFFF00:',
+        'abbr': 'RP'
+    },
+    {
+        'coordinate': 'GPS:Ravarna Space - (R750km):' +
+                      '6892920.19:266488.22:-163203.33:#FFFFFF00:',
+        'abbr': 'RS'
+    },
+    {
+        'coordinate': 'GPS:Umbra Planet - (R250km):' +
+                      '1190569.51:-8672830.43:-1339138.72:#FFFFFF00:',
+        'abbr': 'UP'
+    },
+    {
+        'coordinate': 'GPS:Umbra Space - (R750km):' +
+                      '1190569.51:-8672830.43:-1339138.72:#FFFFFF00:',
+        'abbr': 'US'
+    },
+    {
+        'coordinate': 'GPS:Volcanis Planet - (R250km):' +
+                      '-5311681.54:1664010.91:-3307980.03:#FFFFFF00:',
+        'abbr': 'VP'
+    },
+    {
+        'coordinate': 'GPS:Volcanis Space - (R750km):' +
+                      '-5311681.54:1664010.91:-3307980.03:#FFFFFF00:',
+        'abbr': 'VS'
+    },
+    {
+        'coordinate': 'GPS:Zarion Planet - (R250km):' +
+                      '1088776.01:0:-2619759:#FFFFFF00:',
+        'abbr': 'ZP'
+    },
+    {
+        'coordinate': 'GPS:Zarion Space - (R750km):' +
+                      '1088776.01:0:-2619759:#FFFFFF00:',
+        'abbr': 'ZS'
+    },
+    {
+        'coordinate': 'GPS:The Hub - (R500km):0:0:0:#FFFFFF00:',
+        'abbr': 'HB'
+    },
+    {
+        'coordinate': 'GPS:Roach Motel - (R1500km):0:0:0:#FFFFFF00:',
+        'abbr': 'RM'
+    },
+    {
+        'coordinate': 'GPS:The Goldilocks Zone - (R5000km):0:0:0:#FFFFFF00:',
+        'abbr': 'GZ'
+    },
+    {
+        'coordinate': 'GPS:Roach Hostel - (R6000km):0:0:0:#FFFFFF00:',
+        'abbr': 'RH'
+    },
+    {
+        'coordinate': 'GPS:Contested Barrens - (R8500km):0:0:0:#FFFFFF00:',
+        'abbr': 'CB'
+    }
 ]
 
 # Ore abbreveations, in priority order
@@ -64,6 +176,8 @@ def main():
         usage()
         exit(1)
 
+    process_sectors()
+
     with open(input_filename) as handle:
         coordinates = read_coordinates_from_handle(handle)
 
@@ -91,6 +205,28 @@ def main():
                 handle.write('\n')
 
     print(f'Coordinates output to {output_filename}')
+
+
+def process_sectors():
+    """
+    Process sectors, converting the GPS string into a coordinate dict. Adds the
+    radius.
+
+    Raises
+    ------
+    Exception
+        The sector coordinate name was not in the expected from.
+    """
+
+    for sector in SECTORS:
+        coordinate = parse_coordinate(sector['coordinate'], sector['abbr'])
+        sector['coordinate'] = coordinate
+
+        radius_match = re.search(r'\(R(\d+)km\)', coordinate['name'])
+        if radius_match is None:
+            raise Exception(
+                f"Unexpected sector GPS name: {coordinate['name']}")
+        sector['radius'] = int(radius_match.group(1)) * 1000
 
 
 def usage():
@@ -127,7 +263,7 @@ def read_coordinates_from_handle(coordinate_input):
     return coordinates
 
 
-def parse_coordinate(coordinate_line):
+def parse_coordinate(coordinate_line, sector=None):
     """
     Parse a coordinate line, returning the coordinate dictionary.
 
@@ -135,6 +271,9 @@ def parse_coordinate(coordinate_line):
     ----------
     coordinate_line : str
         The coordinate line.
+    sector : str | None
+        Optional. If not set the sector will be discovered from the sector
+        list.
 
     Returns
     -------
@@ -145,6 +284,7 @@ def parse_coordinate(coordinate_line):
             x : float
             y : float
             z : float
+            sector : str
             colour : str
             notes : str
 
@@ -172,7 +312,39 @@ def parse_coordinate(coordinate_line):
         'notes': coordinate_tokens[6]
     }
 
+    if sector is None:
+        sector = find_coordinate_sector(coordinate)
+    coordinate['sector'] = sector
+
     return coordinate
+
+
+def find_coordinate_sector(coordinate):
+    """
+    Get the sector the coordinate is in.
+
+    Parameters
+    ----------
+    coordinate : dict
+        The coordinate.
+
+    Returns
+    -------
+    str
+        The sector the coordinate is in.
+
+    Raises
+    ------
+    Exception
+        The coordinate was not in a sector.
+    """
+
+    for sector in SECTORS:
+        distance = check_distance(sector['coordinate'], coordinate)
+        if distance < sector['radius']:
+            return sector['abbr']
+
+    raise Exception(f'No sector fonud for coordinate: {str(coordinate)}')
 
 
 def deduplicate_coordinates(coordinates, min_distance):
@@ -542,13 +714,14 @@ def fix_names(resources):
 
     for resource in resources:
         name = resource['name']
-        while (normalized_name := normalize_name(name)) is None:
+        sector = resource['sector']
+        while (normalized_name := normalize_name(name, sector)) is None:
             print(f'Invalid name: {name}')
             name = input('Enter a new name: ').strip()
         resource['name'] = normalized_name
 
 
-def normalize_name(name):
+def normalize_name(name, sector):
     """
     Normalize a resource name.
 
@@ -556,6 +729,8 @@ def normalize_name(name):
     ----------
     name : str
         The resource name.
+    sector : str
+        The sector the resource is in.
 
     Returns
     -------
@@ -564,15 +739,19 @@ def normalize_name(name):
         normalized.
     """
 
-    zone_match = re.match(r'^\s*(?P<zone>\S+)\s+(?P<ores>.+?)(_\d+)?$', name)
-    if zone_match is None:
+    sector_match = re.match(
+        r'^\s*(?P<sector>\S+)\s+(?P<ores>.+?)(_\d+)?$', name)
+    if sector_match is None:
         return None
 
-    zone = zone_match.group('zone').upper()
-    ores = zone_match.group('ores').upper()
+    existing_sector = sector_match.group('sector').upper()
+    ores = sector_match.group('ores').upper()
 
-    if zone not in ZONES:
-        sys.stderr.write(f'Invalid zone: {zone}\n')
+    if existing_sector in ORES:
+        # If sector is an ore just assume sector is missing and continue.
+        ores = f'{existing_sector} {ores}'
+    elif not valid_sector(existing_sector):
+        sys.stderr.write(f'Invalid sector: {existing_sector}\n')
         return None
 
     valid_ores = []
@@ -591,7 +770,7 @@ def normalize_name(name):
 
     valid_ores.sort(key=lambda valid_ore: ORES.index(valid_ore[0]))
 
-    normalized_name = f'{zone}'
+    normalized_name = f"{sector}"
     first = True
     for valid_ore in valid_ores:
         if first:
@@ -606,6 +785,27 @@ def normalize_name(name):
             normalized_name += f' {ore_size}'
 
     return normalized_name
+
+
+def valid_sector(sector_abbr):
+    """
+    Check if the provided sector_abbr is valid.
+
+    Parameters
+    ----------
+    sector_abbr : str
+        The sector abbriviation to check.
+
+    Returns
+    -------
+    bool
+        True if it's a valid sector abbreviation, False otherwise.
+    """
+
+    for sector in SECTORS:
+        if sector['abbr'] == sector_abbr:
+            return True
+    return False
 
 
 def make_names_unique(resources):
