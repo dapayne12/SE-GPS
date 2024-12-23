@@ -234,6 +234,8 @@ def main():
 
     cluster_coordinates(clusters, resources)
 
+    largest_resources = get_largest_resources(resources)
+
     clusters.sort(
         key=lambda cluster: sector_index(cluster['sector']), reverse=True)
 
@@ -243,6 +245,12 @@ def main():
         current_date = datetime.datetime.today().strftime('%Y.%m.%d')
         handle.write(f"# Up-to-date as of {current_date}\n#\n")
         handle.write(f'{OUTPUT_PREAMBLE}\n\n')
+
+        handle.write('# Largest Deposits of Each Ore Mined So Far:\n')
+        for resource in largest_resources:
+            handle.write(f'{coordinate_to_se_gps(resource)}\n')
+        handle.write('\n')
+
         for cluster in clusters:
 
             # Print header if different than the last header
@@ -807,10 +815,12 @@ def fix_names(resources):
     for resource in resources:
         name = resource['name']
         sector = resource['sector']
-        while (normalized_name := normalize_name(name, sector)) is None:
+        while (normalized_values := normalize_name(name, sector)) is None:
             print(f'Invalid name: {name}')
             name = input('Enter a new name: ').strip()
+        (normalized_name, size) = normalized_values
         resource['name'] = normalized_name
+        resource['size'] = size
 
 
 def normalize_name(name, sector):
@@ -826,9 +836,9 @@ def normalize_name(name, sector):
 
     Returns
     -------
-    str | none
-        The normalized name, or None if the name is invalid and couldn't be
-        normalized.
+    tuple (str, int) | None
+        The normalized name and the size of the first resource, or None if the
+        name is invalid and couldn't be normalized.
     """
 
     sector_match = re.match(
@@ -846,13 +856,20 @@ def normalize_name(name, sector):
         sys.stderr.write(f'Invalid sector: {existing_sector}\n')
         return None
 
+    first_size = None
     valid_ores = []
     for ores_match in re.finditer(
             r'\s*(?P<ore>[A-Z]+)(\s+(?P<size>[^,]+)\s*,?)?', ores):
+
         ore = ores_match.group('ore')
         size = ores_match.group('size')
+
+        size_parsed = 0
         if size is not None:
-            size = size.strip()
+            (size, size_parsed) = normalize_size(size)
+
+        if first_size is None:
+            first_size = size_parsed
 
         if ore not in ORES:
             sys.stderr.write(f'Invalid ore: {ore}\n')
@@ -876,7 +893,45 @@ def normalize_name(name, sector):
         if ore_size is not None:
             normalized_name += f' {ore_size}'
 
-    return normalized_name
+    return (normalized_name, first_size)
+
+
+def normalize_size(size):
+    """
+    Normalize the size string, if possible.
+
+    Parameters
+    ----------
+    size : str
+        The size string.
+
+    Returns
+    -------
+    tuple (str, int)
+        If the size was able to be normalized returns the normilized size
+        string and the integer representation of the size for comparison
+        purposes later. If the size was unable to be normilized then the
+        original size string is returned with an integer of 0.
+    """
+
+    size = size.strip()
+
+    match = re.match(r'\(?(([\d.]+)([KMB]))\)?', size)
+    if match is None:
+        return (size, 0)
+
+    size = match.group(1)
+    value = float(match.group(2))
+    unit = match.group(3)
+
+    if unit == 'K':
+        value = int(value * 1000)
+    elif unit == 'M':
+        value = int(value * 1000000)
+    else:
+        value = int(value * 1000000000)
+
+    return (f'({size})', value)
 
 
 def valid_sector(sector_abbr):
@@ -921,6 +976,35 @@ def make_names_unique(resources):
             name_hash[name] += 1
         else:
             name_hash[name] = 2
+
+
+def get_largest_resources(resources):
+    """
+    Get the largest resource for each ore type.
+
+    Parameters
+    ----------
+    resources : list
+        The list of resource coordinates.
+
+    Returns
+    -------
+    list
+        The list of largest resources, one per ore type.
+    """
+
+    largest_resources = {}
+
+    for resource in resources:
+        match = re.match(r'^\S+\s+(\S+)', resource['name'])
+        ore = match.group(1)
+        if ore in largest_resources:
+            if largest_resources[ore]['size'] < resource['size']:
+                largest_resources[ore] = resource
+        else:
+            largest_resources[ore] = resource
+
+    return largest_resources.values()
 
 
 if __name__ == '__main__':
